@@ -11,7 +11,11 @@ type Cache<S> = {
 // generic cached state implementation
 // receives a cache key, the initial value and a data loader function which will be used to refresh
 // the state in the background and update the cache with the new data
-export function useLocalState<S>(key: string, initialValue: S, dataLoader: () => Promise<S>): {state: S, updateAndSaveState: (arg0: S) => void, loading: boolean} {
+export function useLocalState<S>(
+  key: string,
+  initialValue: S,
+  dataLoader: () => Promise<S>
+): { state: S; updateAndSaveState: (arg0: S) => void; loading: boolean } {
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<S>(initialValue);
 
@@ -60,9 +64,9 @@ export function useLocalState<S>(key: string, initialValue: S, dataLoader: () =>
     console.debug(`updating state for key ${key}`);
     setState(prev => ({ ...prev, ...newState }));
     LocalStorage.setItem(key, JSON.stringify({ lastUpdate: Date.now(), data: newState } as Cache<S>));
-  }
+  };
 
-  return {state, updateAndSaveState, loading};
+  return { state, updateAndSaveState, loading };
 }
 
 // clears the specific cache key and displays a toast with the outcome
