@@ -11,7 +11,7 @@ type Cache<S> = {
 // generic cached state implementation
 // receives a cache key, the initial value and a data loader function which will be used to refresh
 // the state in the background and update the cache with the new data
-export function useLocalState<S>(key: string, initialValue: S, dataLoader: () => Promise<S>): [S, boolean] {
+export function useLocalState<S>(key: string, initialValue: S, dataLoader: () => Promise<S>): {state: S, updateAndSaveState: (arg0: S) => void, loading: boolean} {
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<S>(initialValue);
 
@@ -25,7 +25,7 @@ export function useLocalState<S>(key: string, initialValue: S, dataLoader: () =>
       if (typeof dump === "string") {
         console.debug(`cache found for key ${key}`);
         cache = JSON.parse(dump) as Cache<S>;
-        setState(cache.data);
+        setState(prev => ({ ...prev, ...cache.data }));
         setLoading(false);
       }
 
@@ -39,9 +39,13 @@ export function useLocalState<S>(key: string, initialValue: S, dataLoader: () =>
       dataLoader()
         .then(data => {
           console.debug(`new data successfully loaded for key ${key}`);
+          // merge existing cache data with fresh data
+          // only overwrites elements returned by the loader, so additional items in the cache should be
+          // persisted as long as the user doesn't manually clear the cache
+          const merged = { ...cache.data, ...data };
 
-          LocalStorage.setItem(key, JSON.stringify({ lastUpdate: Date.now(), data: data } as Cache<S>));
-          setState(data);
+          LocalStorage.setItem(key, JSON.stringify({ lastUpdate: Date.now(), data: merged } as Cache<S>));
+          setState(prev => ({ ...prev, ...merged }));
 
           setLoading(false);
           showToast(Toast.Style.Success, "data refreshed successfully");
@@ -52,7 +56,13 @@ export function useLocalState<S>(key: string, initialValue: S, dataLoader: () =>
     })();
   }, []);
 
-  return [state, loading];
+  const updateAndSaveState = (newState: S) => {
+    console.debug(`updating state for key ${key}`);
+    setState(prev => ({ ...prev, ...newState }));
+    LocalStorage.setItem(key, JSON.stringify({ lastUpdate: Date.now(), data: newState } as Cache<S>));
+  }
+
+  return {state, updateAndSaveState, loading};
 }
 
 // clears the specific cache key and displays a toast with the outcome
