@@ -4,7 +4,7 @@ export const linkDomain = () => {
   return getPreferenceValues()["domain"] || "app." + getPreferenceValues()["server"];
 };
 
-interface Identifiable {
+export interface Identifiable {
   id: number;
 }
 

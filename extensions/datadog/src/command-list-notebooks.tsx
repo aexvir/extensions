@@ -1,22 +1,16 @@
 import { NotebooksResponseData } from "@datadog/datadog-api-client/dist/packages/datadog-api-client-v1/models/NotebooksResponseData";
-import { Action, ActionPanel, Icon, List } from "@raycast/api";
-import { useNotebooks, clearLocalState, Caches } from "./fetchers";
-import { linkDomain, moveBetween, filterOut } from "./utils";
+import { ActionPanel, Icon, List } from "@raycast/api";
+import { useNotebooks, Caches } from "./fetchers";
+import { linkDomain, filterOut } from "./utils";
+import { GetLinkTo, MarkFavorite, ClearCache } from "./utils/actions";
 
-interface ActionableNotebook {
-  data: NotebooksResponseData;
-  isFavorite?: boolean;
-  fave: (id: number) => void;
-  unfave: (id: number) => void;
-}
-
-const Notebook = ({ data, fave, unfave, isFavorite = false }: ActionableNotebook) => {
-  // prettier-ignore
-  const faveAction = isFavorite
-    ? <Action icon={Icon.XmarkCircle} title="Remove from favourites" onAction={() => { unfave(data.id) }} />
-    : <Action icon={Icon.Star} title="Add to favourites" onAction={() => { fave(data.id) }} />
-
+const Notebook = ({ data, actionables, isFavorite = false }) => {
   const icon = isFavorite ? Icon.Star : null;
+
+  const actions = [];
+  actionables.forEach(action => {
+    actions.push(action(data.id));
+  });
 
   return (
     <List.Item
@@ -25,13 +19,7 @@ const Notebook = ({ data, fave, unfave, isFavorite = false }: ActionableNotebook
       title={data.attributes.name}
       subtitle={data.attributes.metadata?.type}
       accessoryTitle={data.attributes.author?.email}
-      actions={
-        <ActionPanel>
-          <Action.OpenInBrowser url={`https://${linkDomain()}/notebook/${data.id}`} />
-          {faveAction}
-          <Action icon={Icon.Trash} title="Clear notebooks cache" onAction={() => clearLocalState(Caches.Notebooks)} />
-        </ActionPanel>
-      }
+      actions={<ActionPanel>{actions}</ActionPanel>}
     />
   );
 };
@@ -40,32 +28,30 @@ export default function CommandListNotebooks() {
   const { state, updateAndSaveState, notebooksAreLoading } = useNotebooks();
   filterOut(state.notebooks, state.favorites);
 
-  const fave = (id: number) => {
-    moveBetween(state.notebooks, state.favorites, id);
-    updateAndSaveState(state);
-  };
-
-  const unfave = (id: number) => {
-    moveBetween(state.favorites, state.notebooks, id);
-    updateAndSaveState(state);
-  };
+  const actionables = [
+    GetLinkTo(`https://${linkDomain()}/notebook`),
+    MarkFavorite(state.notebooks, state.favorites, updateAndSaveState),
+    ClearCache(Caches.Notebooks),
+  ];
 
   return (
     <List isLoading={notebooksAreLoading}>
       {state.favorites.length > 0 && (
-        <List.Section title="Favourites" key="faves">
+        <List.Section title="Favorites" key="0-faves">
           {state.favorites.map(notebook => (
-            <Notebook key={notebook.id} data={notebook} fave={fave} unfave={unfave} isFavorite={true} />
+            <Notebook key={notebook.id} data={notebook} actionables={actionables} isFavorite={true} />
           ))}
         </List.Section>
       )}
-      {/* this his not very nice, but there is no divider between sections currently */}
+      {/* this is not very nice, but there is no divider between sections currently */}
       {state.favorites.length == 0 ? (
-        state.notebooks.map(notebook => <Notebook key={notebook.id} data={notebook} fave={fave} unfave={unfave} />)
+        state.notebooks.map(notebook => (
+          <Notebook key={notebook.id} data={notebook} actionables={actionables} isFavorite={true} />
+        ))
       ) : (
-        <List.Section title="All notebooks" key="all">
+        <List.Section title="All notebooks" key="1-all">
           {state.notebooks.map(notebook => (
-            <Notebook key={notebook.id} data={notebook} fave={fave} unfave={unfave} />
+            <Notebook key={notebook.id} data={notebook} actionables={actionables} />
           ))}
         </List.Section>
       )}
